@@ -1,0 +1,36 @@
+name: Build Windows (.exe)
+
+# Dijalankan manual dari tab Actions -> "Run workflow" setiap kali rilis versi baru.
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --version "^1.0" --locked
+
+      - name: Build
+        run: cargo tauri build
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: tgdrive-windows-setup
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
