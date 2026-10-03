@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TG Drive</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0b1020;color:#e5e7eb;
+    display:flex;align-items:center;justify-content:center;height:100vh}
+  .card{text-align:center;max-width:420px;padding:32px}
+  .logo{font-size:44px;font-weight:800;margin-bottom:6px}
+  .logo span{color:#4da3ff}
+  .sub{color:#9ca3af;font-size:14px;margin-bottom:28px}
+  .status{color:#9ca3af;font-size:13px;margin-top:18px;min-height:20px}
+  .bar{height:8px;background:#1e293b;border-radius:99px;overflow:hidden;margin-top:14px;display:none}
+  .bar>i{display:block;height:100%;width:0;background:#4da3ff;border-radius:99px;transition:width .2s}
+  .btn{display:inline-block;margin:8px 6px 0;padding:10px 22px;border-radius:10px;border:0;
+    font-size:14px;cursor:pointer;font-weight:600}
+  .btn.primary{background:#2f7fe0;color:#fff}
+  .btn.ghost{background:#1e293b;color:#e5e7eb}
+  .ver{color:#4da3ff;font-weight:700}
+  .err{color:#f87171;font-size:13px;margin-top:12px}
+  .spin{width:34px;height:34px;border:3px solid #1e293b;border-top-color:#4da3ff;
+    border-radius:50%;margin:0 auto;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">TG<span>Drive</span></div>
+  <div class="sub">Cloud drive berbasis Telegram</div>
+  <div id="main"><div class="spin"></div></div>
+  <div class="status" id="status">Memeriksa update…</div>
+  <div class="bar" id="bar"><i id="barFill"></i></div>
+  <div class="err" id="err"></div>
+</div>
+<script>
+// ============ KONFIGURASI RILIS — naikkan tiap rilis baru ============
+const APP_VERSION_CODE = 1;          // integer, wajib naik tiap rilis
+const APP_VERSION_NAME = '1.0.0';    // tampil ke user
+// =====================================================================
+const API_BASE = 'https://drive.gtg.my.id';
+const main = document.getElementById('main');
+const statusEl = document.getElementById('status');
+const errEl = document.getElementById('err');
+const bar = document.getElementById('bar');
+const barFill = document.getElementById('barFill');
+const T = window.__TAURI__ || {};
+
+function say(t){ statusEl.textContent = t||''; }
+function fail(t){ errEl.textContent = t||''; }
+function go(){ location.href = API_BASE + '/drive'; }
+
+function btn(label, cls, fn){
+  const b = document.createElement('button');
+  b.className = 'btn ' + cls; b.textContent = label;
+  b.onclick = fn; return b;
+}
+
+async function checkUpdate(){
+  try{
+    const r = await fetch(API_BASE + '/api/app-version', {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const w = d.windows || {};
+    if(w.version_code > APP_VERSION_CODE && w.url){
+      offerUpdate(w);
+    } else {
+      go();
+    }
+  }catch(e){
+    // offline / server tidak terjangkau: langsung buka aplikasi
+    say('Tidak bisa cek update, membuka aplikasi…');
+    setTimeout(go, 1200);
+  }
+}
+
+function offerUpdate(w){
+  main.innerHTML = '';
+  const p = document.createElement('p');
+  p.innerHTML = 'Update tersedia: <span class="ver">v' + w.version_name + '</span><br>' +
+                '<span style="color:#9ca3af;font-size:13px">Versi kamu: v' + APP_VERSION_NAME + '</span>';
+  main.appendChild(p);
+  main.appendChild(btn('Update sekarang', 'primary', ()=>downloadUpdate(w)));
+  main.appendChild(btn('Lewati', 'ghost', go));
+  say('');
+}
+
+async function downloadUpdate(w){
+  main.innerHTML = ''; fail('');
+  bar.style.display = 'block';
+  say('Mengunduh update…');
+  try{
+    const url = w.url.startsWith('http') ? w.url : API_BASE + w.url;
+    const res = await T.http.fetch(url, {method:'GET', responseType:T.http.ResponseType.Binary});
+    if(res.status !== 200) throw new Error('HTTP '+res.status);
+    const dir = await T.path.downloadDir();
+    const name = 'tgdrive-setup-' + (w.version_name||'new') + '.exe';
+    const dest = dir + name;
+    await T.fs.writeBinaryFile({path: dest, contents: res.data});
+    bar.style.display = 'none';
+    say('Download selesai.');
+    main.appendChild(btn('Jalankan installer', 'primary', async ()=>{
+      await T.shell.open(dest);
+      await T.process.exit();
+    }));
+    main.appendChild(btn('Buka aplikasi saja', 'ghost', go));
+  }catch(e){
+    bar.style.display = 'none';
+    fail('Gagal mengunduh: ' + e.message);
+    main.appendChild(btn('Coba lagi', 'primary', ()=>{main.innerHTML='';downloadUpdate(w);}));
+    main.appendChild(btn('Buka aplikasi saja', 'ghost', go));
+    say('');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Beri waktu sedikit agar splash terlihat, lalu cek update
+  setTimeout(checkUpdate, 600);
+});
+</script>
+</body>
+</html>
