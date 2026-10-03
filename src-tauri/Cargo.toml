@@ -1,0 +1,15 @@
+[package]
+name = "tgdrive"
+version = "1.0.0"
+description = "TG Drive — aplikasi desktop (Tauri)"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }
+
+[dependencies]
+tauri = { version = "1", features = ["api-all"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
